@@ -12,6 +12,7 @@ import requests
 import cv2 as cv
 import numpy as np
 import base64
+from image_util import image_to_base64
 from config import FACE_DETECT_CLIENT_ID, FACE_DETECT_CLIENT_SECRET
 
 last_face_check_result = None
@@ -19,11 +20,14 @@ last_face_check_result = None
 
 # client_id 为官网获取的AK， client_secret 为官网获取的SK
 def _access_token():
-    access_token = requests.get(
+    result = requests.get(
         'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={client_id}&client_secret={client_secret}'.format(
             client_id=FACE_DETECT_CLIENT_ID, client_secret=FACE_DETECT_CLIENT_SECRET),
-        headers={'Content-Type': 'application/json; charset=UTF-8'}).json()['access_token']
-    return access_token
+        headers={'Content-Type': 'application/json; charset=UTF-8'}).json()
+    if 'access_token' not in result:
+        print(result)
+        raise Exception('get access_token error')
+    return result['access_token']
 
 
 '''
@@ -49,8 +53,38 @@ def get_face_list(base64_image):
               'face_type': 'LIVE'}).json()  # 人脸的类型LIVE/IDCARD/WATERMARK/CERT
     if not (result['error_code'] == 0 and 'result' in result and result['result']['face_num'] >= 1):
         print(result)
-    # TODO check who's face
+    else:
+        # TODO check who's face
+        result['result']['face_match'] = []
+        face_match_result = face_match(base64_image, image_to_base64('./images/alan.jpeg'))
+        if face_match_result and 'score' in face_match_result['result'] and face_match_result['result']['score'] > 75:
+            result['result']['face_match'] = ['alan']
 
+    return result
+
+
+def face_match(base64_image, target_base64_image):
+    if type(base64_image) == bytes:
+        base64_image = base64_image.decode('utf-8')
+    result = requests.post(
+        'https://aip.baidubce.com/rest/2.0/face/v3/match?access_token={}'.format(_access_token()),
+        json=[{'image_type': 'BASE64',  # 图片类型: BASE64/URL/FACE_TOKEN
+               'image': base64_image,
+               # 图片信息(总数据大小应小于10M)，图片上传方式根据image_type来判断
+               'face_type': 'LIVE',
+               'quality_control': 'NONE',
+               'liveness_control': 'NONE'},
+              {'image_type': 'BASE64',  # 图片类型: BASE64/URL/FACE_TOKEN
+               'image': target_base64_image,
+               # 图片信息(总数据大小应小于10M)，图片上传方式根据image_type来判断
+               'face_type': 'LIVE',
+               'quality_control': 'NONE',
+               'liveness_control': 'NONE'},
+              ]).json()  # 人脸的类型LIVE/IDCARD/WATERMARK/CERT
+    if not (result['error_code'] == 0):
+        print(result)
+
+    print(result)
     return result
 
 
@@ -91,12 +125,12 @@ def get_face_image(img, face_list, face_rectangle=True, landmark72=True, color=(
             # 下巴
             cv.polylines(img, [pts[0:12 + 1].reshape((-1, 1, 2))], False, color)
             # 左眼
-            cv.polylines(img, [pts[13:21 + 1].reshape((-1, 1, 2))], True, color)
+            cv.polylines(img, [pts[13:20 + 1].reshape((-1, 1, 2))], True, color)
             # 左眉
             cv.polylines(img, [pts[22:29 + 1].reshape((-1, 1, 2))], True, color)
 
             # 右眼
-            cv.polylines(img, [pts[30:38 + 1].reshape((-1, 1, 2))], True, color)
+            cv.polylines(img, [pts[30:37 + 1].reshape((-1, 1, 2))], True, color)
             # 右眉
             cv.polylines(img, [pts[39:46 + 1].reshape((-1, 1, 2))], True, color)
 
@@ -112,10 +146,6 @@ def get_face_image(img, face_list, face_rectangle=True, landmark72=True, color=(
             for pt in pts:
                 cv.circle(img, (pt[0], pt[1]), 1, point_color, -1)
 
-            cv.putText(img, u'name:{}'.format(face_data['gender']['type']),
-                       (pts[1][0], pts[1][1]),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5,
-                       (255, 255, 255), 1, cv.LINE_AA)
             cv.putText(img, u'sex:{}'.format(face_data['gender']['type']), (pts[1][0], pts[1][1] + 25),
                        cv.FONT_HERSHEY_SIMPLEX, 0.5,
                        (255, 255, 255), 1, cv.LINE_AA)
@@ -123,5 +153,9 @@ def get_face_image(img, face_list, face_rectangle=True, landmark72=True, color=(
                        cv.FONT_HERSHEY_SIMPLEX,
                        0.5,
                        (255, 255, 255), 1, cv.LINE_AA)
-
+        for index in range(0, len(face_list['result']['face_match'])):
+            cv.putText(img, 'face_match:{}'.format(face_list['result']['face_match'][index]), (50, 50 + index * 20),
+                       cv.FONT_HERSHEY_SIMPLEX,
+                       0.5,
+                       (255, 255, 255), 1, cv.LINE_AA)
         return img

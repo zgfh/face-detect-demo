@@ -37,6 +37,17 @@ def face_detect_job(img):
 
 while (1):
     ret, img = cap.read()
+    keycode = cv2.waitKey(1)
+
+    # ' ':保存图片
+    if keycode == ord(' '):
+        imgName = "i_" + str(time.time())
+        cv2.imwrite("./img/" + imgName + ".jpeg", img)
+        print("save image {} ok".format("img/" + imgName + ".jpeg"))
+    # 'q':退出
+    if keycode == ord('q'):
+        break
+
     if time.time() - last_run_time > 1:
         poll_thread = Thread(target=face_detect_job, args=(img,))
         poll_thread.daemon = True
@@ -47,16 +58,7 @@ while (1):
         img = get_face_image(img, last_face_result, face_rectangle=False)
 
     cv2.imshow("capture", img)
-    keycode = cv2.waitKey(1)
 
-    # ' ':保存图片
-    if keycode == ord(' '):
-        imgName = "i_" + str(time)
-        cv2.imwrite("./img/" + imgName + ".jpeg", img)
-        print("save image {} ok".format("img/" + imgName + ".jpeg"))
-    # 'q':退出
-    if keycode == ord('q'):
-        break
 cap.release()
 cv2.destroyAllWindows()
 
