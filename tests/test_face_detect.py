@@ -16,9 +16,9 @@ import cv2 as cv
 
 
 def test_show_image():
-    face_list = get_face_list(image_to_base64(u'./images/demo_image.jpg'))
+    face_list = get_face_list(image_to_base64(u'../images/demo_image.jpg'))
 
-    img = cv.imdecode(np.fromstring(base64.b64decode(image_to_base64(u'./images/demo_image.jpg')), np.uint8),
+    img = cv.imdecode(np.fromstring(base64.b64decode(image_to_base64(u'../images/demo_image.jpg')), np.uint8),
                       cv.IMREAD_ANYCOLOR)
     img = get_face_image(img, face_list)
     cv.imshow("who", img)
@@ -27,4 +27,4 @@ def test_show_image():
 
 
 def test_show_image():
-    result = face_match(image_to_base64(u'./images/demo_image.jpg'), image_to_base64(u'./images/demo_image.jpg'))
+    result = face_match(image_to_base64(u'../images/demo_image.jpg'), image_to_base64(u'../images/demo_image.jpg'))
