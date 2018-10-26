@@ -13,30 +13,49 @@
 import cv2
 import numpy
 import matplotlib.pyplot as plot
-from face_detect import get_face_image
+from face_detect import get_face_image, get_face_list
 import base64
 import numpy as np
+import time
+from threading import Thread
 
 # 摄像头对象
 cap = cv2.VideoCapture(0)
 # 显示
-i = 0
-while (1):
-    ret, frame = cap.read()
-    retval, buffer = cv2.imencode('.jpg', frame)
-    jpg_as_text = base64.b64encode(buffer)
-    face_image = get_face_image(jpg_as_text,face_rectangle=False)
-    img = cv2.imdecode(np.fromstring(base64.b64decode(face_image), np.uint8), cv2.IMREAD_ANYCOLOR)
-    cv2.imshow("capture", img)
-    # ' ':保存图片
+last_run_time = 0
+last_face_result = None
 
-    if cv2.waitKey(1) & 0xFF == ord(' '):
-        i = i + 1
-        imgName = "i_" + str(i)
-        cv2.imwrite("./img/" + imgName + ".jpeg", frame)
+
+def face_detect_job(img):
+    global last_face_result
+    print('check face start:', time.time())
+    retval, buffer = cv2.imencode('.jpg', img)
+    jpg_as_text = base64.b64encode(buffer)
+    last_face_result = get_face_list(jpg_as_text)
+    print('check face finish', time.time())
+
+
+while (1):
+    ret, img = cap.read()
+    if time.time() - last_run_time > 1:
+        poll_thread = Thread(target=face_detect_job, args=(img,))
+        poll_thread.daemon = True
+        poll_thread.start()
+        last_run_time = time.time()
+
+    if last_face_result:
+        img = get_face_image(img, last_face_result, face_rectangle=False)
+
+    cv2.imshow("capture", img)
+    keycode = cv2.waitKey(1)
+
+    # ' ':保存图片
+    if keycode == ord(' '):
+        imgName = "i_" + str(time)
+        cv2.imwrite("./img/" + imgName + ".jpeg", img)
         print("save image {} ok".format("img/" + imgName + ".jpeg"))
     # 'q':退出
-    if (cv2.waitKey(1) & 0xFF == ord('q')):
+    if keycode == ord('q'):
         break
 cap.release()
 cv2.destroyAllWindows()
