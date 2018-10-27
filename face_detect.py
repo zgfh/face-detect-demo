@@ -13,7 +13,8 @@ import cv2 as cv
 import numpy as np
 import base64
 from image_util import image_to_base64
-from config import FACE_DETECT_CLIENT_ID, FACE_DETECT_CLIENT_SECRET
+from config import FACE_DETECT_CLIENT_ID, FACE_DETECT_CLIENT_SECRET, FACE_MATCH_DIR
+import os
 
 last_face_check_result = None
 
@@ -28,6 +29,12 @@ def _access_token():
         print(result)
         raise Exception('get access_token error')
     return result['access_token']
+
+
+def _absoluteFilePaths(directory):
+    for dirpath, _, filenames in os.walk(directory):
+        for f in filenames:
+            yield os.path.abspath(os.path.join(dirpath, f))
 
 
 '''
@@ -54,22 +61,23 @@ def get_face_list(base64_image):
     if not (result['error_code'] == 0 and 'result' in result and result['result']['face_num'] >= 1):
         print(result)
     else:
-        # TODO check who's face
-        result['result']['face_match'] = []
-        face_match_result = face_match(base64_image, image_to_base64('./images/alan.jpeg'))
-        if face_match_result and 'score' in face_match_result['result'] and face_match_result['result']['score'] > 75:
-            result['result']['face_match'] = ['alan']
-
+        for face_data in result['result']['face_list']:
+            face_data['face_match'] = '__'
+            for image_file in _absoluteFilePaths(FACE_MATCH_DIR):
+                face_match_result = face_match(face_data['face_token'], image_to_base64(image_file))
+                if face_match_result and 'score' in face_match_result['result'] and face_match_result['result'][
+                    'score'] > 75:
+                    face_data['face_match'] = os.path.splitext(os.path.basename(image_file))[0]
     return result
 
 
-def face_match(base64_image, target_base64_image):
-    if type(base64_image) == bytes:
-        base64_image = base64_image.decode('utf-8')
+def face_match(face_token, target_base64_image):
+    if type(target_base64_image) == bytes:
+        target_base64_image = target_base64_image.decode('utf-8')
     result = requests.post(
         'https://aip.baidubce.com/rest/2.0/face/v3/match?access_token={}'.format(_access_token()),
-        json=[{'image_type': 'BASE64',  # 图片类型: BASE64/URL/FACE_TOKEN
-               'image': base64_image,
+        json=[{'image_type': 'FACE_TOKEN',  # 图片类型: BASE64/URL/FACE_TOKEN
+               'image': face_token,
                # 图片信息(总数据大小应小于10M)，图片上传方式根据image_type来判断
                'face_type': 'LIVE',
                'quality_control': 'NONE',
@@ -146,6 +154,9 @@ def get_face_image(img, face_list, face_rectangle=True, landmark72=True, color=(
             for pt in pts:
                 cv.circle(img, (pt[0], pt[1]), 1, point_color, -1)
 
+            cv.putText(img, u'name:{}'.format(face_data['face_match']), (pts[1][0], pts[1][1] + 0),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.5,
+                       (255, 255, 255), 1, cv.LINE_AA)
             cv.putText(img, u'sex:{}'.format(face_data['gender']['type']), (pts[1][0], pts[1][1] + 25),
                        cv.FONT_HERSHEY_SIMPLEX, 0.5,
                        (255, 255, 255), 1, cv.LINE_AA)
@@ -153,9 +164,5 @@ def get_face_image(img, face_list, face_rectangle=True, landmark72=True, color=(
                        cv.FONT_HERSHEY_SIMPLEX,
                        0.5,
                        (255, 255, 255), 1, cv.LINE_AA)
-        for index in range(0, len(face_list['result']['face_match'])):
-            cv.putText(img, 'face_match:{}'.format(face_list['result']['face_match'][index]), (50, 50 + index * 20),
-                       cv.FONT_HERSHEY_SIMPLEX,
-                       0.5,
-                       (255, 255, 255), 1, cv.LINE_AA)
-        return img
+
+    return img

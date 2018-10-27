@@ -49,9 +49,11 @@ while (1):
         break
 
     if time.time() - last_run_time > 1:
+        last_run_time = time.time()
         poll_thread = Thread(target=face_detect_job, args=(img,))
-        poll_thread.daemon = True
+        poll_thread.daemon = False
         poll_thread.start()
+        poll_thread.join()
         last_run_time = time.time()
 
     if last_face_result:

@@ -21,9 +21,9 @@ def test_show_image():
     img = cv.imdecode(np.fromstring(base64.b64decode(image_to_base64(u'../images/demo_image.jpg')), np.uint8),
                       cv.IMREAD_ANYCOLOR)
     img = get_face_image(img, face_list)
-    cv.imshow("who", img)
-    cv.waitKey()
-    cv.destroyAllWindows()
+    _, buffer = cv.imencode('.jpg', img)
+    base64_image = base64.b64encode(buffer)
+    show_image(base64_image)
 
 
 def test_show_image():
